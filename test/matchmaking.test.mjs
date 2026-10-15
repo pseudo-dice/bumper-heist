@@ -16,6 +16,7 @@ test('Quick Play skips private rooms, creates public lobbies and fills existing 
   const second=(await api({action:'quick',name:'Second'})).data;
   assert.notEqual(first.code,privateHost.code);assert.equal(first.code,second.code);
   assert.equal(rooms.get(first.code).isPublic,true);
+  assert.equal((await api({...first,action:'start'})).status,400);
   const reader=await connect(first);
   let text='';while(!text.includes('data: '))text+=new TextDecoder().decode((await reader.read()).value);
   const snapshot=JSON.parse(text.split('\n').find(line=>line.startsWith('data: ')).slice(6));
@@ -26,9 +27,17 @@ test('Quick Play skips private rooms, creates public lobbies and fills existing 
   assert.equal((await api({...first,action:'visibility',isPublic:false})).status,200);
   const third=(await api({action:'quick'})).data;assert.notEqual(third.code,first.code);
   assert.equal((await api({action:'join',code:first.code,name:'Invited'})).status,200);
-  assert.equal((await api({...first,action:'start'})).status,200);
+  assert.equal((await api({...second,action:'start'})).status,200);
   assert.equal((await api({...first,action:'visibility',isPublic:true})).status,400);
   assert.equal(rooms.get(first.code).phase,'playing');
+  const r=rooms.get(first.code);r.phase='finished';
+  assert.equal((await api({...third,code:first.code,action:'rematch'})).status,400);
+  const disconnected=r.players.find(p=>p.id===first.id);disconnected.connected=false;
+  assert.equal((await api({...first,action:'rematch'})).status,400);
+  disconnected.connected=true;
+  assert.equal((await api({...second,action:'rematch'})).status,200);
+  assert.equal(r.phase,'lobby');assert.equal(r.players.length,2);
+
 });
 test('Quick Play skips full public lobbies and rooms outside the lobby',async()=>{
   const now=Date.now();

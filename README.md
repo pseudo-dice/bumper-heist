@@ -43,11 +43,11 @@ Original arena diameter was 680. Arena size stays fixed through sudden death.
 
 ## Rules
 
-WASD/arrows or a touch joystick to steer. Space/BUMP to dash (3-second cooldown). Push the GOLD ball into your own side's goal for 1 point, regardless of last touch. First team to 5 wins; otherwise highest score after 3 minutes of active play. Goal countdowns pause the clock. Tied teams play sudden death; other players spectate. Every 20 seconds, a 5-second hazard appears (spinning bumpers, crosswind, bouncy walls). Team members can bump one another. The host can return everyone to the lobby for a rematch.
+WASD/arrows or a touch joystick to steer. Space/BUMP to dash (3-second cooldown). Push the GOLD ball into your own side's goal for 1 point, regardless of last touch. First team to 5 wins; otherwise highest score after 3 minutes of active play. Goal countdowns pause the clock. Tied teams play sudden death; other players spectate. Every 20 seconds, a 5-second hazard appears (spinning bumpers, crosswind, bouncy walls). Team members can bump one another. Any connected player can choose **Rematch** to return everyone to the lobby after a match.
 
 ## Technical notes
 
-The Node server owns physics and scoring, simulates 60 steps/sec, and streams snapshots at about 30/sec. Clients send controls at 20/sec and smooth received positions. Rooms live in server memory and disappear on server restart. No accounts or permanent scores. Only the host can start/rematch. Joining mid-match is locked. Interrupted streams reconnect automatically; a per-tab token supports refresh recovery. Offline players remain in the current match and host control transfers after 15 seconds.
+The Node server owns physics and scoring, simulates 60 steps/sec, and streams snapshots at about 30/sec. Clients send controls at 20/sec and smooth received positions. Rooms live in server memory and disappear on server restart. No accounts or permanent scores. Any connected player can start when at least two drivers are connected, or request a rematch after the match finishes. Only the host can change room visibility. Joining mid-match is locked. Interrupted streams reconnect automatically; a per-tab token supports refresh recovery. Offline players remain in the current match and host control transfers after 15 seconds.
 
 This version is for local/LAN testing and has not been publicly deployed. Browser visual QA is not verified in the build environment. Internet hosting, lag compensation and audio remain later work.
 
@@ -67,7 +67,7 @@ No purchased domain is required: use the HTTPS `onrender.com` address assigned b
 
 ## Quick Play, room visibility, and trial limits
 
-- **Quick Play** joins the fullest public lobby with a free slot, or creates a public room. The host starts the match when at least two drivers are connected. Running matches and private rooms are excluded.
+- **Quick Play** joins the fullest public lobby with a free slot, or creates a public room. Any connected player can start the match when at least two drivers are connected. Running matches and private rooms are excluded.
 - **Start a room** defaults to private. Turn on **Public room** to allow Quick Play players. The host can change visibility in the lobby. Private rooms still accept room codes, links, and QR invites.
 - The server allows **5 simultaneous rooms**, counting lobbies, games, and results. Existing rooms can still accept players when the cap is reached.
 - Lobbies close after **15 minutes** without a join, visibility change, or match start. Results close after **10 minutes** without a rematch. A visible countdown warns players, and closure returns them to the entry screen. Active matches are not interrupted by idle deadlines.

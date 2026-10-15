@@ -64,15 +64,15 @@ export const server=http.createServer(async(req,res)=>{
       }
       if(!r)throw Error('Room not found. Check the code.');
       if(b.action==='join'||b.action==='quick'){
-        if(r.phase!=='lobby')throw Error('This match has started. Ask the host for a rematch.');if(r.players.length>=8)throw Error('This room is full (8 players).');
+        if(r.phase!=='lobby')throw Error('This match has started. Join again after a rematch.');if(r.players.length>=8)throw Error('This room is full (8 players).');
         const p=newPlayer(b.name);p.color=COLORS.find(c=>!r.players.some(p=>p.color===c));r.players.push(p);r.lastActivity=Date.now();broadcast(r);return send({code:r.code,token:p.token,id:p.id});
       }
       const p=player(r,b.token);if(p.connected)p.seen=Date.now();
       if(b.action==='input'){
         const x=Number(b.x),y=Number(b.y);if(!Number.isFinite(x)||!Number.isFinite(y))throw Error('Invalid controls.');p.input={x:Math.max(-1,Math.min(1,x)),y:Math.max(-1,Math.min(1,y)),bump:p.input.bump||b.bump===true};p.inputAt=Date.now();return send({ok:true});
       }
-      if(b.action==='start'){if(p.id!==r.host)throw Error('Only the host can start.');if(r.phase!=='lobby')throw Error('Match already started.');start(r);r.lastActivity=Date.now();}
-      else if(b.action==='rematch'){if(p.id!==r.host)throw Error('Only the host can open the rematch.');if(r.phase!=='finished')throw Error('Finish this match first.');r.phase='lobby';r.players=r.players.filter(p=>p.connected);r.players.forEach(p=>p.score=0);r.finalists=null;r.lastActivity=Date.now();}
+      if(b.action==='start'){if(!p.connected)throw Error('Reconnect to the room before starting a match.');if(r.phase!=='lobby')throw Error('Match already started.');start(r);r.lastActivity=Date.now();}
+      else if(b.action==='rematch'){if(!p.connected)throw Error('Reconnect to the room before requesting a rematch.');if(r.phase!=='finished')throw Error('Finish this match first.');r.phase='lobby';r.players=r.players.filter(p=>p.connected);r.players.forEach(p=>p.score=0);r.finalists=null;r.lastActivity=Date.now();}
       else if(b.action==='visibility'){if(p.id!==r.host)throw Error('Only the host can change room visibility.');if(r.phase!=='lobby')throw Error('Room visibility can only change in the lobby.');if(typeof b.isPublic!=='boolean')throw Error('Invalid room visibility.');r.isPublic=b.isPublic;r.lastActivity=Date.now();}
       else if(b.action==='leave'){p.connected=false;p.seen=0;p.stream?.end();p.stream=null;if(r.phase==='lobby')r.players=r.players.filter(q=>q!==p);if(r.host===p.id)r.host=r.players.find(q=>q.connected)?.id;if(!r.players.length)rooms.delete(r.code);}
       else throw Error('Unknown action.');broadcast(r);return send({ok:true});

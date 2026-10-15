@@ -37,7 +37,7 @@ test('invite links preserve public HTTPS behind a hosting proxy and LAN HTTP',as
     assert.deepEqual(result.data.urls,[origin+'/?room='+host.code]);
   }
 });
-test('real HTTP rooms synchronize clients, reject unauthorized starts and overflow',async()=>{
+test('real HTTP rooms synchronize clients, allow guest starts and rematches, and reject invalid sessions and overflow',async()=>{
   const host=(await api({action:'create',name:'Host'})).data;
   const invite=await fetch(base+'/invite?room='+host.code);
   assert.equal(invite.status,200);
@@ -52,13 +52,25 @@ test('real HTTP rooms synchronize clients, reject unauthorized starts and overfl
   const streams=await Promise.all(players.map((p,i)=>fetch(base+'/events?'+new URLSearchParams({code:p.code,token:p.token}),{signal:controllers[i].signal})));
   const readers=streams.map(s=>s.body.getReader());
   assert.equal((await api({action:'join',code:host.code,name:'Overflow'})).status,400);
-  assert.equal((await api({...host,action:'start'})).status,200);
+  assert.equal((await api({...guest,token:'invalid',action:'start'})).status,400);
+  assert.equal((await api({...guest,action:'start'})).status,200);
+  assert.equal((await api({...host,action:'start'})).status,400);
   assert.equal((await api({action:'join',code:host.code})).status,400);
   const readPlaying=async reader=>{let data='';for(let i=0;i<30;i++){data+=new TextDecoder().decode((await reader.read()).value);const snapshots=data.split('\n').filter(l=>l.startsWith('data: ')).map(l=>JSON.parse(l.slice(6)));const s=snapshots.find(s=>s.phase==='playing');if(s)return s;}throw Error('No playing snapshot');};
   const snapshots=await Promise.all(readers.map(readPlaying));for(const s of snapshots){assert.equal(s.players.length,8);assert.equal(s.code,host.code);assert.equal(s.teams.length,2);assert.equal(s.arena.radius,560);assert.equal(s.decoy.id,'decoy');assert.ok(s.arena.pads.length===4);assert.ok(!JSON.stringify(s).includes(host.token));}
   assert.equal((await api({...guest,action:'input',x:1,y:0,bump:true})).status,200);
   assert.equal((await api({...guest,token:'invalid',action:'input',x:1,y:0})).status,400);
-  rooms.get(host.code).phase='finished';assert.equal((await api({...host,action:'rematch'})).status,200);assert.equal(rooms.get(host.code).phase,'lobby');
+  assert.equal((await api({...guest,action:'rematch'})).status,400);
+  rooms.get(host.code).phase='finished';
+  assert.equal((await api({...guest,token:'invalid',action:'rematch'})).status,400);
+  const rematches=await Promise.all([guest,host].map(p=>api({...p,action:'rematch'})));
+  assert.deepEqual(rematches.map(r=>r.status).sort(),[200,400]);
+  assert.equal(rooms.get(host.code).phase,'lobby');
+  assert.ok(rooms.get(host.code).players.every(p=>p.score===0));
+  assert.equal((await api({...host,action:'start'})).status,200);
+  rooms.get(host.code).phase='finished';
+  assert.equal((await api({...host,action:'rematch'})).status,200);
+  assert.equal(rooms.get(host.code).phase,'lobby');
   controllers.forEach(c=>c.abort());
 });
 after(async()=>{for(const r of rooms.values())for(const p of r.players)p.stream?.end();server.closeAllConnections();await new Promise(resolve=>server.close(resolve));});

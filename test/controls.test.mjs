@@ -5,7 +5,7 @@ import vm from 'node:vm';
 
 test('keyboard feedback, HTTPS invites, entry options and expired-room recovery',async()=>{
   const nodes=new Map(),events={};
-  const node=id=>{if(!nodes.has(id)){const classes=new Set();nodes.set(id,{dataset:{},style:{},value:'',open:false,classList:{add(name){classes.add(name);},toggle(name,on){if(on)classes.add(name);else classes.delete(name);},contains:name=>classes.has(name)},getContext:()=>({}),setPointerCapture(){},showModal(){this.open=true;},close(){this.open=false;}});}return nodes.get(id);};
+  const node=id=>{if(!nodes.has(id)){const classes=new Set();nodes.set(id,{dataset:{},style:{},value:'',open:false,classList:{add(name){classes.add(name);},toggle(name,on){if(on)classes.add(name);else classes.delete(name);},contains:name=>classes.has(name)},getContext:()=>({}),append(){},replaceChildren(){},setPointerCapture(){},showModal(){this.open=true;},close(){this.open=false;}});}return nodes.get(id);};
   const keyNodes=['w arrowup','a arrowleft','s arrowdown','d arrowright',' '].map((keys,i)=>{const n=node('key'+i);n.dataset.keys=keys;return n;});
   const context=vm.createContext({document:{getElementById:node,querySelectorAll:selector=>selector==='[data-keys]'?keyNodes:[],addEventListener(name,fn){events[name]=fn;}},addEventListener(name,fn){events[name]=fn;},requestAnimationFrame(){},setInterval(){},sessionStorage:{getItem:()=>null},location:{search:''},URLSearchParams,console});
   const source=(await readFile(new URL('../public/client.mjs',import.meta.url),'utf8')).replace(/^import .*;\n/gm,'');
@@ -49,5 +49,25 @@ test('keyboard feedback, HTTPS invites, entry options and expired-room recovery'
   context.fetch=async()=>({ok:false,status:400,json:async()=>({error:'Room not found.'})});
   await vm.runInContext('source.onerror()',context);
   assert.equal(vm.runInContext('session',context),null);assert.match(node('error').textContent,/expired/);
+
+  // Guest buttons follow connection and match state, independently of host privileges.
+  let elementId=0;
+  context.document.body={dataset:{}};
+  context.document.createElement=()=>node('element'+elementId++);
+  vm.runInContext(`session={id:'guest'};state={code:'ROOM1',host:'host',phase:'lobby',isPublic:false,
+    arena:{teamMode:true,theme:'Volt Stadium'},players:[
+      {id:'host',name:'Host',teamId:'blue',connected:true},
+      {id:'guest',name:'Guest',teamId:'orange',connected:true}
+    ],teams:[{id:'blue',name:'Blue crew',score:0},{id:'orange',name:'Orange crew',score:0}]};render();`,context);
+  assert.equal(node('start').disabled,false);
+  assert.equal(node('lobbyPublic').disabled,true);
+  assert.match(node('hostHint').textContent,/Any player can start/);
+  vm.runInContext('state.players[0].connected=false;render()',context);
+  assert.equal(node('start').disabled,true);
+  vm.runInContext("state.phase='finished';state.winner='orange';render()",context);
+  assert.equal(node('rematch').disabled,false);
+  assert.match(node('rematchHint').textContent,/Any player can choose Rematch/);
+  vm.runInContext('state.players[1].connected=false;render()',context);
+  assert.equal(node('rematch').disabled,true);
 
 });
