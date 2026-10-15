@@ -1,0 +1,1 @@
+{"name":"bumper-heist","private":true,"type":"module","version":"0.2.0","scripts":{"start":"node server.mjs","test":"node --test"},"engines":{"node":">=20"}}
